@@ -205,13 +205,26 @@ class SimpleHTTPServer
     private Thread _serverThread;
     private string _rootDirectory;
     private HttpListener _listener;
+    private int _numRequests = 0;
     private int _port;
     private bool _done = false;
+    private Dictionary<string, int> pathsRequested = new Dictionary<string, int>();
 
     public int Port
     {
         get { return _port; }
         private set { }
+    }
+
+    public int NumRequests
+    {
+        get { return _numRequests; }
+        private set { _numRequests = value; }
+    }
+
+    public Dictionary<string, int> PathsRequested
+    {
+        get{ return pathsRequested; }
     }
 
     /// <summary>
@@ -258,6 +271,7 @@ class SimpleHTTPServer
             try
             {
                 HttpListenerContext context = _listener.GetContext();
+                NumRequests += 1;
                 Process(context);
             }
             catch (Exception ex)
@@ -275,6 +289,7 @@ class SimpleHTTPServer
     private void Process(HttpListenerContext context)
     {
         string filename = context.Request.Url.AbsolutePath;
+        pathsRequested[filename] = pathsRequested.GetValueOrDefault(filename, 0) + 1;
         filename = filename.Substring(1);
         Console.WriteLine($"{filename} is the path");
 
