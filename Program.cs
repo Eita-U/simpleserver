@@ -1,6 +1,20 @@
 ﻿using System.Text.Json;
 
-static void TestJSON() {
+static void TestJSON()
+{
+    var options = new JsonSerializerOptions
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
+    string text = File.ReadAllText("config.json");
+    var config = JsonSerializer.Deserialize<Config>(text, options);
+
+    Console.WriteLine($"MimeMappings: {config.MimeTypes[".html"]}");
+    Console.WriteLine($"IndexFiles: {config.IndexFiles[0]}");
+}
+
+static void TestJSON2() {
     var options = new JsonSerializerOptions
     {
         PropertyNameCaseInsensitive = true
@@ -15,7 +29,7 @@ static void TestJSON() {
 }
 
 static void TestServer() {
-    SimpleHTTPServer server = new SimpleHTTPServer("files", 8080);
+    SimpleHTTPServer server = new SimpleHTTPServer("files", 8080, "config.json");
     string helpMessage = @"You can try the following commands:
     help - display this help message
     stop - stop the server
