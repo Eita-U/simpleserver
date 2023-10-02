@@ -157,7 +157,7 @@ class FooHandler : IServlet {
 class ErrorHandler : IServlet {
     public void ProcessRequest(HttpListenerContext context) {
     string response = $@"
-            <H1>Page Not Found.</H1>
+            <H1>Custom 404: Page Not Found.</H1>
             <h2>Check the URL again</h2>
             <p>Request path: {context.Request.Url.AbsolutePath}</p>
 ";
