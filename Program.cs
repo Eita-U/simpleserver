@@ -35,6 +35,7 @@ static void TestServer() {
     stop - stop the server
     numreqs - display the number of requests
     paths - display the number of times each path was requested
+    errorPaths - display the number of times each error path was requested
 ";
     while (true)
     {
@@ -60,6 +61,14 @@ static void TestServer() {
             {
                 Console.WriteLine($"{path.Key}: {path.Value}");
             }
+        }
+        else if(command.Equals("errorPaths"))
+        {
+             foreach (var path in server.ErrorPathsRequested)
+            {
+                Console.WriteLine($"{path.Key}: {path.Value}");
+            }
+            
         }
         else
         {

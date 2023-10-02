@@ -45,51 +45,94 @@ class BookHandler : IServlet {
     }
 
     public void ProcessRequest(HttpListenerContext context) {
-        int bookNum = 0;
-        if(context.Request.QueryString.AllKeys.Contains("n"))
-        {
-            bookNum = Int32.Parse(context.Request.QueryString["n"]);
+        string response = "";
+        if(context.Request.QueryString.AllKeys.Contains("cmd")){
+            string cmd = context.Request.QueryString["cmd"];
+            if(cmd.Equals("list")){
+                int start = Int32.Parse(context.Request.QueryString["s"]);
+                int end = Int32.Parse(context.Request.QueryString["e"]);
+                List<Book> sublist = books.GetRange(start, end - start + 1);
+
+                response = $@"
+            <table border=1>
+            <tr>
+                <th>Title</th>
+                <th>Author</th>
+                <th>Short Description</th>
+                <th>Long Description</th>
+            </tr>";
+            foreach (Book book in sublist)
+            {
+                string authors = String.Join(",<br>", book.Authors);
+                response += $@"
+            <tr>
+                <td>{book.Title}</td>
+                <td>{authors}</td>
+                <td>{book.ShortDescription}</td>
+                <td>{book.LongDescription}</td>
+            </tr>";
+            }
+            response += "</table>";
+            }
+        }else if(context.Request.QueryString.AllKeys.Contains("n")){
+            int bookNum = Int32.Parse(context.Request.QueryString["n"]);
+            Book book = books[bookNum];
+
+            // convert book.Authors, which is a list, into a string with ", <br>" in between each author
+            // string.Join() is a very useful method
+            string delimiter = ",<br> ";
+            string authors = string.Join(delimiter, book.Authors);
+
+            // build the HTML response
+            // @ means a multiline string (Java doesn't have this)
+            // $ means string interpolation (Java doesn't have this either)
+            response = $@"
+            <table border=1>
+            <tr>
+                <th>Title</th>
+                <th>Author</th>
+                <th>Short Description</th>
+                <th>Long Description</th>
+            </tr>
+            <tr>
+                <td>{book.Title}</td>
+                <td>{authors}</td>
+                <td>{book.ShortDescription}</td>
+                <td>{book.LongDescription}</td>
+            </tr>
+            </table>
+            ";
+        }else{
+            Book book = books[4];
+
+            // convert book.Authors, which is a list, into a string with ", <br>" in between each author
+            // string.Join() is a very useful method
+            string delimiter = ",<br> ";
+            string authors = string.Join(delimiter, book.Authors);
+
+            // build the HTML response
+            // @ means a multiline string (Java doesn't have this)
+            // $ means string interpolation (Java doesn't have this either)
+            response = $@"
+            <table border=1>
+            <tr>
+                <th>Title</th>
+                <th>Author</th>
+                <th>Short Description</th>
+                <th>Long Description</th>
+            </tr>
+            <tr>
+                <td>{book.Title}</td>
+                <td>{authors}</td>
+                <td>{book.ShortDescription}</td>
+                <td>{book.LongDescription}</td>
+            </tr>
+            </table>
+            ";
         }
 
-        // grab a random book
-        Book book = books[bookNum];
+        SimpleHTTPServer.Respond(response, context);
 
-        // convert book.Authors, which is a list, into a string with ", <br>" in between each author
-        // string.Join() is a very useful method
-        string delimiter = ",<br> ";
-        string authors = string.Join(delimiter, book.Authors);
-
-        // build the HTML response
-        // @ means a multiline string (Java doesn't have this)
-        // $ means string interpolation (Java doesn't have this either)
-        string response = $@"
-        <table border=1>
-        <tr>
-            <th>Title</th>
-            <th>Author</th>
-            <th>Short Description</th>
-            <th>Long Description</th>
-        </tr>
-        <tr>
-            <td>{book.Title}</td>
-            <td>{authors}</td>
-            <td>{book.ShortDescription}</td>
-            <td>{book.LongDescription}</td>
-        </tr>
-        </table>
-        ";
-       
-        // write HTTP response to the output stream
-        // all of the context.response stuff is setting the headers for the HTTP response
-        byte[] bytes = System.Text.Encoding.UTF8.GetBytes(response);
-        context.Response.ContentType = "text/html";
-        context.Response.ContentLength64 = bytes.Length;
-        context.Response.AddHeader("Date", DateTime.Now.ToString("r"));
-        context.Response.AddHeader("Last-Modified", DateTime.Now.ToString("r"));
-        context.Response.StatusCode = (int)HttpStatusCode.OK;
-        context.Response.OutputStream.Write(bytes, 0, bytes.Length);
-        context.Response.OutputStream.Flush();
-        context.Response.OutputStream.Close();
     }
 }
 /// <summary>
@@ -107,21 +150,148 @@ class FooHandler : IServlet {
         foreach ( String s in context.Request.QueryString.AllKeys )
             response += $"<p>{s} -> {context.Request.QueryString[s]}</p>\n";
 
-        byte[] bytes = System.Text.Encoding.UTF8.GetBytes(response);
-
-        context.Response.ContentType = "text/html";
-        context.Response.ContentLength64 = bytes.Length;
-        context.Response.AddHeader("Date", DateTime.Now.ToString("r"));
-        context.Response.AddHeader("Last-Modified", DateTime.Now.ToString("r"));
-        context.Response.StatusCode = (int)HttpStatusCode.OK;
-
-        context.Response.OutputStream.Write(bytes, 0, bytes.Length);
-
-        context.Response.OutputStream.Flush();
-        context.Response.OutputStream.Close();
+        SimpleHTTPServer.Respond(response, context);
     }
 }
 
+class ErrorHandler : IServlet {
+    public void ProcessRequest(HttpListenerContext context) {
+    string response = $@"
+            <H1>Page Not Found.</H1>
+            <h2>Check the URL again</h2>
+            <p>Request path: {context.Request.Url.AbsolutePath}</p>
+";
+        SimpleHTTPServer.Respond(response, context);
+    }
+}
+
+class Book2Handler : IServlet {
+    private List<Book> books;
+
+    public Book2Handler()
+    {
+        var options = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
+        string text = File.ReadAllText(@"json/books.json");
+        books = JsonSerializer.Deserialize<List<Book>>(text, options);
+    }
+
+    public void ProcessRequest(HttpListenerContext context) {
+        string response = "";
+        if(context.Request.QueryString.AllKeys.Contains("a")){
+            string author = context.Request.QueryString["a"];
+            IEnumerable<Book> searchResult = books.Where(n => String.Join(",<br>", n.Authors).ToLower().Contains(author.ToLower()));
+
+            response = $@"
+            <table border=1>
+            <tr>
+                <th>Title</th>
+                <th>Author</th>
+                <th>Short Description</th>
+                <th>Long Description</th>
+            </tr>";
+            foreach (Book book in searchResult)
+            {
+                string authors = String.Join(",<br>", book.Authors);
+                response += $@"
+            <tr>
+                <td>{book.Title}</td>
+                <td>{authors}</td>
+                <td>{book.ShortDescription}</td>
+                <td>{book.LongDescription}</td>
+            </tr>";
+            }
+
+            SimpleHTTPServer.Respond(response, context);
+        }
+    }
+}
+
+/// <summary>
+/// ShowHandler: Servlet that reads a JSON file and returns shows.
+/// Shows can be looked up by either the name or the season number
+/// </summary>
+class ShowHandler : IServlet {
+    private List<Show> shows;
+
+    public ShowHandler()
+    {
+        var options = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
+        string text = File.ReadAllText(@"json/buffy.json");
+        shows = JsonSerializer.Deserialize<List<Show>>(text, options);
+    }
+    public void ProcessRequest(HttpListenerContext context) {
+        string response = "";
+        if(context.Request.QueryString.AllKeys.Contains("n")){
+            string name = context.Request.QueryString["n"];
+            IEnumerable<Show> searchResult = shows.Where(n => n.Name.ToLower().Contains(name.ToLower()));
+
+            response = $@"
+            <table border=1>
+            <tr>
+                <th>Title</th>
+                <th>Summary</th>
+                <th>Runtime</th>
+                <th>URL</th>
+            </tr>";
+            foreach (Show show in searchResult)
+            {
+                response += $@"
+            <tr>
+                <td>{show.Name}</td>
+                <td>{show.Summary}</td>
+                <td>{show.Runtime}</td>
+                <td>{show.Url}</td>
+            </tr>";
+            }
+
+            SimpleHTTPServer.Respond(response, context);
+        }else if(context.Request.QueryString.AllKeys.Contains("s")){
+            int season = Int32.Parse(context.Request.QueryString["s"]);
+            IEnumerable<Show> searchResult = shows.Where(n => n.Season == season);
+
+            response = $@"
+            <table border=1>
+            <tr>
+                <th>Title</th>
+                <th>Summary</th>
+                <th>Season</th>
+                <th>Number</th>
+                <th>URL</th>
+            </tr>";
+            foreach (Show show in searchResult)
+            {
+                response += $@"
+            <tr>
+                <td>{show.Name}</td>
+                <td>{show.Summary}</td>
+                <td>{show.Season}</td>
+                <td>{show.Number}</td>
+                <td>{show.Url}</td>
+            </tr>";
+            }
+
+            SimpleHTTPServer.Respond(response, context);
+        }else{
+            response = $@"
+            <table border=1>
+            <tr>
+                <th>Title</th>
+                <th>Summary</th>
+                <th>Runtime</th>
+                <th>URL</th>
+            </tr>";
+            SimpleHTTPServer.Respond(response, context);
+        }
+    }
+}
 
 class SimpleHTTPServer
 {
@@ -131,6 +301,9 @@ class SimpleHTTPServer
     private static IDictionary<string, IServlet> _servlets = new Dictionary<string, IServlet>() {
         {"foo", new FooHandler()},
         {"books", new BookHandler()},
+        {"error", new ErrorHandler()},
+        {"books2", new Book2Handler()},
+        {"shows", new ShowHandler()}
     };
 
     // list of default index files
@@ -151,6 +324,8 @@ class SimpleHTTPServer
     private bool _done = false;
     private Dictionary<string, int> pathsRequested = new Dictionary<string, int>();
 
+    private Dictionary<string, int> errorPathsRequested = new Dictionary<string, int>();
+
     public int Port
     {
         get { return _port; }
@@ -161,6 +336,11 @@ class SimpleHTTPServer
     {
         get { return _numRequests; }
         private set { _numRequests = value; }
+    }
+
+    public Dictionary<string, int> ErrorPathsRequested
+    {
+        get{ return errorPathsRequested; }
     }
 
     public Dictionary<string, int> PathsRequested
@@ -201,6 +381,20 @@ class SimpleHTTPServer
         _listener.Close();
     }
 
+    public static void Respond(string response, HttpListenerContext context){
+        // write HTTP response to the output stream
+        // all of the context.response stuff is setting the headers for the HTTP response
+        byte[] bytes = System.Text.Encoding.UTF8.GetBytes(response);
+        context.Response.ContentType = "text/html";
+        context.Response.ContentLength64 = bytes.Length;
+        context.Response.AddHeader("Date", DateTime.Now.ToString("r"));
+        context.Response.AddHeader("Last-Modified", DateTime.Now.ToString("r"));
+        context.Response.StatusCode = (int)HttpStatusCode.OK;
+        context.Response.OutputStream.Write(bytes, 0, bytes.Length);
+        context.Response.OutputStream.Flush();
+        context.Response.OutputStream.Close();
+    }
+
     private void Listen()
     {
         _listener = new HttpListener();
@@ -230,13 +424,18 @@ class SimpleHTTPServer
     private void Process(HttpListenerContext context)
     {
         string filename = context.Request.Url.AbsolutePath;
-        pathsRequested[filename] = pathsRequested.GetValueOrDefault(filename, 0) + 1;
+        if(filename.Equals("/foo") || filename.Equals("/books") || filename.Equals("/") || filename.Equals("/error") || filename.Equals("/books2") || filename.Equals("/shows")){
+            pathsRequested[filename] = pathsRequested.GetValueOrDefault(filename, 0) + 1;
+        }else{
+            errorPathsRequested[filename] = errorPathsRequested.GetValueOrDefault(filename, 0) + 1;
+        }
         filename = filename.Substring(1);
         Console.WriteLine($"{filename} is the path");
 
         // check if the path is mapped to a servlet
         if (_servlets.ContainsKey(filename))
         {
+            Console.WriteLine(filename);
             _servlets[filename].ProcessRequest(context);
             return;
         }
@@ -263,6 +462,7 @@ class SimpleHTTPServer
         {
             try
             {
+                Console.WriteLine(filename);
                 Stream input = new FileStream(filename, FileMode.Open);
                 
                 //Adding permanent http response headers
@@ -292,7 +492,10 @@ class SimpleHTTPServer
         {
             // This sends a 404 if the file doesn't exist or cannot be read
             // TODO: customize the 404 page
-            context.Response.StatusCode = (int)HttpStatusCode.NotFound;
+
+            // context.Response.StatusCode = (int)HttpStatusCode.NotFound;
+            _servlets["error"].ProcessRequest(context);
+            return;
         }
         
         context.Response.OutputStream.Close();
